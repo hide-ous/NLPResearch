@@ -2,17 +2,23 @@
 
 import spacy
 
-nlp = spacy.load('en_core_web_sm')
+nlp = spacy.load('en_core_web_lg')
 doc = nlp(u'I guess, since FBI claims it couldn’t match Tsarnaev, we can assume ...')
 
-count = 0;
-innerCount = 0;
-hasNSUBJ = False;
-hasCCOMP = False;
+hasNSUBJ = False
+hasCCOMP = False
+isNamedEntity = False
+
+claimLeft = 0
+claimLeftEnd = 0
+claimRightStart = 0
+claimRightEnd = 0
+
+claimMark = doc[0]
+cue = doc[0]
+
 for token in doc:
 
-    claimMark = doc[0]; #just declaring claimMark to be some random part of sentence
-    cue = doc[0]
     #getting the cue from a sentence
     if (token.pos_ == 'VERB' and (token.lemma_ == 'say' or token.lemma_ == 'report'
                                   or token.lemma_ == 'tell' or token.lemma_ == 'told'
@@ -33,33 +39,36 @@ for token in doc:
                                   or token.lemma_ == 'feel')): 
         
         #check if the potential cue has a NSUBJ and a CCOMP
-        for child in doc[count].children:
+        for child in token.children:
             if (child.dep_ == 'nsubj'):
-                hasNSUBJ = True;
+                hasNSUBJ = True
             if (child.dep_ == 'ccomp'):
-                hasCCOMP = True;
+                hasCCOMP = True
         
         #only taking the cue if it has an NSUBJ and CCOMP child
         if (hasNSUBJ and hasCCOMP):
-            cue = doc[count];
-            print('The cue is ' + token.text)
+            cue = token
         
-        #obtaining source and mark of the claim
-        for child in cue.children:
-            innerCount += 1;
-            if (child.dep_ == 'nsubj'):
-                print('The source is ' + child.text)
-            if (child.dep_ == 'ccomp'):
-                claimMark = child;
+            #obtaining source and mark of the claim
+            for child in cue.children:
+                if (child.dep_ == 'nsubj' and child.ent_type != 0):
+                    isNamedEntity = True
+                    source = child
+                if (child.dep_ == 'ccomp'):
+                    claimMark = child
                 
                 
         
-        print('The claim is ')
-        for child in claimMark.lefts:
-            print(child.text + ' ')
-        print(claimMark.text + ' ')
-        for child in claimMark.rights:
-            print(child.text + ' ')
+            #if the potential source found is a named entity, then we can proceed
+            #with the processing
+            if (isNamedEntity):
+                print('The source is ' + source.text)
+                print('The cue is ' + cue.text)
         
-    count += 1;
-
+                children = list(claimMark.subtree)
+                childrenIndices = [child.i for child in children]
+                claimStart = min(childrenIndices)
+                claimEnd = max(childrenIndices) + 1
+                claim = doc[claimStart:claimEnd]
+                
+                print('The claim is ' + claim.text)
